@@ -12,7 +12,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -48,11 +47,11 @@ fun GameScreen(
 
     var animTime by remember { mutableFloatStateOf(0f) }
 
-    // Start background music when screen first appears
+    // Clean up audio resources on dispose
     DisposableEffect(Unit) {
-        audio.startBgm()
         onDispose {
             audio.stopBgm()
+            audio.stopSplashSound()
         }
     }
 
@@ -111,13 +110,21 @@ fun GameScreen(
                     }
                 }
         ) {
-            // Main 60fps Game Canvas
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                renderer.render(this, engine, animTime)
+            // Main 60fps Game Canvas (rendered during gameplay, pause, title, and game over)
+            if (engine.gameState != GameState.SPLASH) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    renderer.render(this, engine, animTime)
+                }
             }
 
             // UI Layer based on Game State
             when (engine.gameState) {
+                GameState.SPLASH -> {
+                    SplashScreen(
+                        engine = engine,
+                        audio = audio
+                    )
+                }
                 GameState.TITLE -> {
                     TitleScreen(
                         engine = engine,

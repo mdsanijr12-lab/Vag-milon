@@ -1,6 +1,7 @@
 package com.example.game
 
 enum class GameState {
+    SPLASH,
     TITLE,
     PLAYING,
     PAUSED,

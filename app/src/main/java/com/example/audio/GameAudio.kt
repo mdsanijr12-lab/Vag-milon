@@ -9,9 +9,9 @@ import com.example.R
 
 class GameAudio(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null
+    private var splashPlayer: MediaPlayer? = null
     private var soundPool: SoundPool? = null
     private var jumpSoundId: Int = 0
-    private var coinSoundId: Int = 0
     private var isMuted: Boolean = false
     private var isBgmPlaying: Boolean = false
 
@@ -30,6 +30,38 @@ class GameAudio(private val context: Context) {
             jumpSoundId = soundPool?.load(context, R.raw.jump, 1) ?: 0
         } catch (e: Exception) {
             Log.e("GameAudio", "Error initializing SoundPool", e)
+        }
+    }
+
+    fun playSplashSound() {
+        if (isMuted) return
+        try {
+            stopSplashSound()
+            splashPlayer = MediaPlayer.create(context, R.raw.splash)?.apply {
+                isLooping = false
+                setVolume(1.0f, 1.0f)
+                setOnCompletionListener {
+                    it.release()
+                    splashPlayer = null
+                }
+                start()
+            }
+        } catch (e: Exception) {
+            Log.e("GameAudio", "Error playing splash sound", e)
+        }
+    }
+
+    fun stopSplashSound() {
+        try {
+            splashPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.release()
+            }
+            splashPlayer = null
+        } catch (e: Exception) {
+            Log.e("GameAudio", "Error stopping splash sound", e)
         }
     }
 
@@ -100,6 +132,7 @@ class GameAudio(private val context: Context) {
         isMuted = !isMuted
         if (isMuted) {
             pauseBgm()
+            stopSplashSound()
         } else {
             resumeBgm()
             if (mediaPlayer == null || mediaPlayer?.isPlaying == false) {
@@ -113,6 +146,7 @@ class GameAudio(private val context: Context) {
 
     fun release() {
         stopBgm()
+        stopSplashSound()
         soundPool?.release()
         soundPool = null
     }

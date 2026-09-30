@@ -21,10 +21,18 @@ class GameEngine(
         context.getSharedPreferences("vag_milon_vag_prefs", Context.MODE_PRIVATE)
 
     // Game state
-    var gameState by mutableStateOf(GameState.TITLE)
+    var gameState by mutableStateOf(GameState.SPLASH)
         private set
     var gameOverReason by mutableStateOf(GameOverReason.CAUGHT_BY_STUDENTS)
         private set
+
+    fun onSplashFinished() {
+        if (gameState == GameState.SPLASH) {
+            gameState = GameState.TITLE
+            audio.stopSplashSound()
+            audio.startBgm()
+        }
+    }
 
     // Dimensions
     var screenWidth by mutableFloatStateOf(1280f)
@@ -100,8 +108,8 @@ class GameEngine(
             // Proportional character sizes
             playerStandHeight = height * 0.28f
             playerStandWidth = playerStandHeight * (124f / 256f)
-            playerCrouchHeight = height * 0.16f
-            playerCrouchWidth = playerCrouchHeight * (140f / 128f)
+            playerCrouchHeight = height * 0.12f
+            playerCrouchWidth = playerStandHeight * (140f / 232f)
 
             enemyHeight = height * 0.32f
             enemyWidth = enemyHeight * (597f / 526f)
@@ -382,11 +390,11 @@ class GameEngine(
                 )
             }
             ObstacleType.OVERHEAD_BEAM -> {
-                // Overhead beam: hits a standing runner, cleared by crouching/sliding
-                val h = screenHeight * 0.10f
+                // Overhead beam: hits a standing runner, cleared cleanly by crouching/sliding underneath
+                val h = screenHeight * 0.085f
                 val w = screenHeight * 0.22f
-                // Positioned above the slide clearance, but below the standing runner height
-                val y = groundY - playerStandHeight + (screenHeight * 0.04f)
+                // Positioned so the bottom of the beam is safely above the slide height
+                val y = groundY - (screenHeight * 0.225f)
                 Obstacle(
                     id = ++idCounter,
                     type = type,
@@ -438,22 +446,49 @@ class GameEngine(
     }
 
     private fun checkCollisions() {
-        val currentW = if (playerPose == PlayerPose.CROUCH) playerCrouchWidth else playerStandWidth
-        val currentH = if (playerPose == PlayerPose.CROUCH) playerCrouchHeight else playerStandHeight
-
-        val playerLeft = playerX + 10f
-        val playerRight = playerX + currentW - 10f
-        val playerTop = playerY - currentH + 8f
-        val playerBottom = playerY
+        // Player hitbox matching actual visible character pose
+        val (playerLeft, playerRight, playerTop, playerBottom) = when (playerPose) {
+            PlayerPose.CROUCH -> {
+                // Shorter and lower collision hitbox for slide: snug on road, low height
+                val hitboxW = playerCrouchWidth * 0.72f
+                val hitboxH = screenHeight * 0.082f
+                val left = playerX + (playerCrouchWidth - hitboxW) / 2f
+                val bottom = groundY - 2f
+                val top = bottom - hitboxH
+                val right = left + hitboxW
+                PlayerHitbox(left, right, top, bottom)
+            }
+            PlayerPose.JUMP -> {
+                val hitboxW = playerStandWidth * 0.68f
+                val hitboxH = playerStandHeight * 0.78f
+                val left = playerX + (playerStandWidth - hitboxW) / 2f
+                val bottom = playerY - 2f
+                val top = bottom - hitboxH
+                val right = left + hitboxW
+                PlayerHitbox(left, right, top, bottom)
+            }
+            PlayerPose.RUN -> {
+                val hitboxW = playerStandWidth * 0.68f
+                val hitboxH = playerStandHeight * 0.78f
+                val left = playerX + (playerStandWidth - hitboxW) / 2f
+                val bottom = groundY - 2f
+                val top = bottom - hitboxH
+                val right = left + hitboxW
+                PlayerHitbox(left, right, top, bottom)
+            }
+        }
 
         // 1. Obstacle collisions
         for (obs in obstacles) {
             if (obs.isHit) continue
 
-            val obsLeft = obs.x + 6f
-            val obsRight = obs.x + obs.width - 6f
-            val obsTop = obs.y + 4f
-            val obsBottom = obs.y + obs.height
+            // Forgiving margins on obstacles so transparent borders never trigger unfair collisions
+            val obsMarginX = obs.width * 0.10f
+            val obsMarginY = obs.height * 0.08f
+            val obsLeft = obs.x + obsMarginX
+            val obsRight = obs.x + obs.width - obsMarginX
+            val obsTop = obs.y + obsMarginY
+            val obsBottom = obs.y + obs.height - 2f
 
             val overlaps = playerRight > obsLeft &&
                     playerLeft < obsRight &&
@@ -476,13 +511,16 @@ class GameEngine(
         }
 
         // 2. Coin collection
+        val playerCenterX = (playerLeft + playerRight) / 2f
+        val playerCenterY = (playerTop + playerBottom) / 2f
+        val collectRadius = 45f
+
         for (coin in coins) {
             if (coin.isCollected) continue
 
-            val dx = (playerX + currentW / 2f) - coin.x
-            val dy = (playerY - currentH / 2f) - coin.y
+            val dx = playerCenterX - coin.x
+            val dy = playerCenterY - coin.y
             val distSq = dx * dx + dy * dy
-            val collectRadius = 45f
 
             if (distSq < collectRadius * collectRadius) {
                 coin.isCollected = true
@@ -597,3 +635,11 @@ class GameEngine(
         }
     }
 }
+
+private data class PlayerHitbox(
+    val left: Float,
+    val right: Float,
+    val top: Float,
+    val bottom: Float
+)
+
