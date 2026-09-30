@@ -1,0 +1,6 @@
+{
+  "name": "Vag Milon Vag",
+  "description": "An action-packed 2D endless runner where Milon escapes the chasing mob with his propeller backpack. Created by Sani.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
