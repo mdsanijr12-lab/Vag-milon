@@ -26,12 +26,35 @@ class GameEngine(
     var gameOverReason by mutableStateOf(GameOverReason.CAUGHT_BY_STUDENTS)
         private set
 
+    // Active Selected Character (Persisted across restarts, 100% Free)
+    var selectedCharacter by mutableStateOf(SelectedCharacter.CHARACTER_1)
+        private set
+    var char2AssetVersion by mutableIntStateOf(0)
+        private set
+
     fun onSplashFinished() {
         if (gameState == GameState.SPLASH) {
             gameState = GameState.TITLE
             audio.stopSplashSound()
             audio.startBgm()
         }
+    }
+
+    fun openCharacterSelection() {
+        gameState = GameState.CHARACTER_SELECT
+    }
+
+    fun closeCharacterSelection() {
+        gameState = GameState.TITLE
+    }
+
+    fun equipCharacter(character: SelectedCharacter) {
+        selectedCharacter = character
+        prefs.edit().putInt("selected_character", character.id).apply()
+    }
+
+    fun notifyChar2AssetsUpdated() {
+        char2AssetVersion++
     }
 
     // Dimensions
@@ -94,6 +117,7 @@ class GameEngine(
     init {
         bestDistance = prefs.getFloat("best_distance", 0f)
         bestCoins = prefs.getInt("best_coins", 0)
+        selectedCharacter = SelectedCharacter.fromId(prefs.getInt("selected_character", 1))
     }
 
     fun updateScreenSize(width: Float, height: Float) {
@@ -188,11 +212,11 @@ class GameEngine(
         if (gameState != GameState.PLAYING) return
 
         if (isOnGround) {
-            // First jump from ground - play jump sound once!
+            // First jump from ground - play active character's jump sound once!
             playerVy = jumpVelocity
             isOnGround = false
             playerPose = PlayerPose.JUMP
-            audio.playJumpSound()
+            audio.playJumpSound(selectedCharacter)
 
             spawnDustParticles(playerX + 25f, groundY, 7)
         } else if (playerVy > -320f) {

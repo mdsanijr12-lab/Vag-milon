@@ -22,13 +22,20 @@ class GameRenderer(
     private val playerRunBitmap: Bitmap?,
     private val playerJumpBitmap: Bitmap?,
     private val playerCrouchBitmap: Bitmap?,
-    private val enemiesBitmap: Bitmap?
+    private val enemiesBitmap: Bitmap?,
+    private val char2RunSprite: PoseSprite? = null,
+    private val char2JumpSprite: PoseSprite? = null,
+    private val char2SlideSprite: PoseSprite? = null
 ) {
     private val bgImage = bgBitmap?.asImageBitmap()
     private val playerRunImage = playerRunBitmap?.asImageBitmap()
     private val playerJumpImage = playerJumpBitmap?.asImageBitmap()
     private val playerCrouchImage = playerCrouchBitmap?.asImageBitmap()
     private val enemiesImage = enemiesBitmap?.asImageBitmap()
+
+    private val char2RunImage = char2RunSprite?.bitmap?.asImageBitmap()
+    private val char2JumpImage = char2JumpSprite?.bitmap?.asImageBitmap()
+    private val char2SlideImage = char2SlideSprite?.bitmap?.asImageBitmap()
 
     fun render(
         drawScope: DrawScope,
@@ -121,6 +128,7 @@ class GameRenderer(
         val px = engine.playerX
         val py = engine.playerY
         val isStumbling = engine.stumbleTimer > 0f
+        val isChar2 = engine.selectedCharacter == SelectedCharacter.CHARACTER_2
 
         // Stumble blink effect
         if (isStumbling && sin(animTime * 28f) > 0.35f) {
@@ -129,18 +137,27 @@ class GameRenderer(
 
         when (engine.playerPose) {
             PlayerPose.RUN -> {
-                // Running pose: visible feet at 203/256 of image height
-                val visibleRatio = 203f / 256f
+                val visibleRatio = if (isChar2 && char2RunSprite != null) {
+                    char2RunSprite.visibleBottomRatio
+                } else {
+                    203f / 256f
+                }
+                val aspect = if (isChar2 && char2RunSprite != null) {
+                    char2RunSprite.aspectRatio
+                } else {
+                    124f / 256f
+                }
                 val fullHeight = engine.playerStandHeight / visibleRatio
-                val fullWidth = fullHeight * (124f / 256f)
+                val fullWidth = fullHeight * aspect
 
                 // Gentle footstep bobbing on the road
                 val bob = abs(sin(animTime * 16f)) * 4f
                 val drawY = engine.groundY - (fullHeight * visibleRatio) + bob
 
-                if (playerRunImage != null) {
+                val img = if (isChar2 && char2RunImage != null) char2RunImage else playerRunImage
+                if (img != null) {
                     drawImage(
-                        image = playerRunImage,
+                        image = img,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
                         dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
                     )
@@ -148,17 +165,26 @@ class GameRenderer(
             }
 
             PlayerPose.JUMP -> {
-                // Jump pose: visible feet at 194/256 of image height
-                val visibleRatio = 194f / 256f
+                val visibleRatio = if (isChar2 && char2JumpSprite != null) {
+                    char2JumpSprite.visibleBottomRatio
+                } else {
+                    194f / 256f
+                }
+                val aspect = if (isChar2 && char2JumpSprite != null) {
+                    char2JumpSprite.aspectRatio
+                } else {
+                    120f / 256f
+                }
                 val fullHeight = engine.playerStandHeight / visibleRatio
-                val fullWidth = fullHeight * (120f / 256f)
+                val fullWidth = fullHeight * aspect
 
                 // Elevated above the road based on jump physics
                 val drawY = py - (fullHeight * visibleRatio)
 
-                if (playerJumpImage != null) {
+                val img = if (isChar2 && char2JumpImage != null) char2JumpImage else playerJumpImage
+                if (img != null) {
                     drawImage(
-                        image = playerJumpImage,
+                        image = img,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
                         dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
                     )
@@ -166,17 +192,26 @@ class GameRenderer(
             }
 
             PlayerPose.CROUCH -> {
-                // Slide/Crouch pose: visible bottom at 176/232 of image height
-                val visibleRatio = 176f / 232f
+                val visibleRatio = if (isChar2 && char2SlideSprite != null) {
+                    char2SlideSprite.visibleBottomRatio
+                } else {
+                    176f / 232f
+                }
+                val aspect = if (isChar2 && char2SlideSprite != null) {
+                    char2SlideSprite.aspectRatio
+                } else {
+                    140f / 232f
+                }
                 val fullHeight = engine.playerCrouchHeight / visibleRatio
-                val fullWidth = fullHeight * (140f / 232f)
+                val fullWidth = fullHeight * aspect
 
                 // Resting flat on the road
                 val drawY = engine.groundY - (fullHeight * visibleRatio)
 
-                if (playerCrouchImage != null) {
+                val img = if (isChar2 && char2SlideImage != null) char2SlideImage else playerCrouchImage
+                if (img != null) {
                     drawImage(
-                        image = playerCrouchImage,
+                        image = img,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
                         dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
                     )

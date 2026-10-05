@@ -35,14 +35,28 @@ fun GameScreen(
 
     val engine = remember { GameEngine(context, audio) }
 
-    // Load Bitmaps once
-    val renderer = remember {
+    // Load Bitmaps for Character 1 and Character 2
+    val renderer = remember(engine.char2AssetVersion) {
         val bgBmp = BitmapFactory.decodeResource(context.resources, R.drawable.bg_city)
         val runBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_run)
         val jumpBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_jump)
         val crouchBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_crouch)
         val enemiesBmp = BitmapFactory.decodeResource(context.resources, R.drawable.enemies_chase)
-        GameRenderer(bgBmp, runBmp, jumpBmp, crouchBmp, enemiesBmp)
+
+        val char2Run = com.example.game.Character2AssetManager.loadRunSprite(context)
+        val char2Jump = com.example.game.Character2AssetManager.loadJumpSprite(context)
+        val char2Slide = com.example.game.Character2AssetManager.loadSlideSprite(context)
+
+        GameRenderer(
+            bgBitmap = bgBmp,
+            playerRunBitmap = runBmp,
+            playerJumpBitmap = jumpBmp,
+            playerCrouchBitmap = crouchBmp,
+            enemiesBitmap = enemiesBmp,
+            char2RunSprite = char2Run,
+            char2JumpSprite = char2Jump,
+            char2SlideSprite = char2Slide
+        )
     }
 
     var animTime by remember { mutableFloatStateOf(0f) }
@@ -128,6 +142,14 @@ fun GameScreen(
                 GameState.TITLE -> {
                     TitleScreen(
                         engine = engine,
+                        onStartGame = { engine.startGame() },
+                        onOpenCharacters = { engine.openCharacterSelection() }
+                    )
+                }
+                GameState.CHARACTER_SELECT -> {
+                    CharacterSelectionScreen(
+                        engine = engine,
+                        onBack = { engine.closeCharacterSelection() },
                         onStartGame = { engine.startGame() }
                     )
                 }

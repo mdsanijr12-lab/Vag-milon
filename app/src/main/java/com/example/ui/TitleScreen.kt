@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeUp
@@ -34,30 +36,35 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.game.Character2AssetManager
 import com.example.game.GameEngine
+import com.example.game.SelectedCharacter
 
 @Composable
 fun TitleScreen(
     engine: GameEngine,
     onStartGame: () -> Unit,
+    onOpenCharacters: () -> Unit = { engine.openCharacterSelection() },
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val scaleAnim by infiniteTransition.animateFloat(
         initialValue = 1.0f,
@@ -68,6 +75,10 @@ fun TitleScreen(
         ),
         label = "buttonPulse"
     )
+
+    val char2RunSprite = remember(engine.char2AssetVersion) {
+        Character2AssetManager.loadRunSprite(context)
+    }
 
     Box(
         modifier = modifier
@@ -82,7 +93,7 @@ fun TitleScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left Column: Character preview & Story hint
+            // Left Column: Active Character preview & Best Record
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -94,17 +105,35 @@ fun TitleScreen(
                     shape = RoundedCornerShape(20.dp),
                     color = Color(0xCC0D47A1),
                     border = androidx.compose.foundation.BorderStroke(3.dp, Color(0xFFFFD54F)),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .clickable { onOpenCharacters() }
                 ) {
-                    Box(
+                    Column(
                         modifier = Modifier.padding(12.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.player_run),
-                            contentDescription = "Milon Running Character",
-                            modifier = Modifier.size(110.dp),
-                            contentScale = ContentScale.Fit
+                        if (engine.selectedCharacter == SelectedCharacter.CHARACTER_2) {
+                            Image(
+                                bitmap = char2RunSprite.bitmap.asImageBitmap(),
+                                contentDescription = "Character 2 Running",
+                                modifier = Modifier.size(96.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        } else {
+                            Image(
+                                painter = painterResource(id = R.drawable.player_run),
+                                contentDescription = "Character 1 Running",
+                                modifier = Modifier.size(96.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Equipped: ${engine.selectedCharacter.displayName}",
+                            color = Color(0xFFFFD54F),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -115,26 +144,26 @@ fun TitleScreen(
                     modifier = Modifier.padding(horizontal = 8.dp)
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = "BEST RECORD",
                             color = Color(0xFFFFD54F),
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "${engine.bestDistance.toInt()} m  |  🪙 ${engine.bestCoins}",
                             color = Color.White,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
             }
 
-            // Center Column: Main Game Title & Creator
+            // Center Column: Main Game Title, Creator & Action Buttons
             Column(
                 modifier = Modifier
                     .weight(1.4f)
@@ -146,7 +175,7 @@ fun TitleScreen(
                 Text(
                     text = "VAG MILON VAG",
                     color = Color(0xFFFFEB3B),
-                    fontSize = 38.sp,
+                    fontSize = 36.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
                     textAlign = TextAlign.Center,
@@ -176,7 +205,7 @@ fun TitleScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // START GAME BUTTON
                 Button(
@@ -196,13 +225,43 @@ fun TitleScreen(
                             imageVector = Icons.Default.PlayArrow,
                             contentDescription = "Start Game",
                             tint = Color.Black,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "START RUNNING",
                             color = Color.Black,
                             fontSize = 18.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // CHARACTER SELECTION BUTTON
+                Button(
+                    onClick = onOpenCharacters,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB300)),
+                    shape = RoundedCornerShape(24.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+                    modifier = Modifier.testTag("character_select_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "Select Character",
+                            tint = Color.Black,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "CHARACTERS (FREE)",
+                            color = Color.Black,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Black
                         )
                     }

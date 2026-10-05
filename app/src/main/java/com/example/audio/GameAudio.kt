@@ -6,12 +6,14 @@ import android.media.MediaPlayer
 import android.media.SoundPool
 import android.util.Log
 import com.example.R
+import com.example.game.SelectedCharacter
 
 class GameAudio(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null
     private var splashPlayer: MediaPlayer? = null
     private var soundPool: SoundPool? = null
-    private var jumpSoundId: Int = 0
+    private var jumpChar1SoundId: Int = 0
+    private var jumpChar2SoundId: Int = 0
     private var isMuted: Boolean = false
     private var isBgmPlaying: Boolean = false
 
@@ -27,7 +29,8 @@ class GameAudio(private val context: Context) {
                 .setAudioAttributes(audioAttributes)
                 .build()
 
-            jumpSoundId = soundPool?.load(context, R.raw.jump, 1) ?: 0
+            jumpChar1SoundId = soundPool?.load(context, R.raw.jump, 1) ?: 0
+            jumpChar2SoundId = soundPool?.load(context, R.raw.jump_char2, 1) ?: 0
         } catch (e: Exception) {
             Log.e("GameAudio", "Error initializing SoundPool", e)
         }
@@ -117,11 +120,15 @@ class GameAudio(private val context: Context) {
         }
     }
 
-    fun playJumpSound() {
+    fun playJumpSound(character: SelectedCharacter = SelectedCharacter.CHARACTER_1) {
         if (isMuted) return
         try {
-            if (jumpSoundId != 0) {
-                soundPool?.play(jumpSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
+            val soundId = when (character) {
+                SelectedCharacter.CHARACTER_1 -> jumpChar1SoundId
+                SelectedCharacter.CHARACTER_2 -> jumpChar2SoundId
+            }
+            if (soundId != 0) {
+                soundPool?.play(soundId, 1.0f, 1.0f, 1, 0, 1.0f)
             }
         } catch (e: Exception) {
             Log.e("GameAudio", "Error playing jump sound", e)

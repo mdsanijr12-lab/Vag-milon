@@ -3,9 +3,20 @@ package com.example.game
 enum class GameState {
     SPLASH,
     TITLE,
+    CHARACTER_SELECT,
     PLAYING,
     PAUSED,
     GAME_OVER
+}
+
+enum class SelectedCharacter(val id: Int, val displayName: String) {
+    CHARACTER_1(1, "Character 1"),
+    CHARACTER_2(2, "Character 2");
+
+    companion object {
+        fun fromId(id: Int): SelectedCharacter =
+            if (id == 2) CHARACTER_2 else CHARACTER_1
+    }
 }
 
 enum class PlayerPose {
