@@ -6,14 +6,13 @@ import android.media.MediaPlayer
 import android.media.SoundPool
 import android.util.Log
 import com.example.R
-import com.example.game.SelectedCharacter
 
 class GameAudio(private val context: Context) {
     private var mediaPlayer: MediaPlayer? = null
     private var splashPlayer: MediaPlayer? = null
     private var soundPool: SoundPool? = null
-    private var jumpChar1SoundId: Int = 0
-    private var jumpChar2SoundId: Int = 0
+    private var jumpSoundId: Int = 0
+    private var isJumpSoundLoaded: Boolean = false
     private var isMuted: Boolean = false
     private var isBgmPlaying: Boolean = false
 
@@ -25,12 +24,17 @@ class GameAudio(private val context: Context) {
                 .build()
 
             soundPool = SoundPool.Builder()
-                .setMaxStreams(5)
+                .setMaxStreams(4)
                 .setAudioAttributes(audioAttributes)
-                .build()
+                .build()?.apply {
+                    setOnLoadCompleteListener { _, sampleId, status ->
+                        if (status == 0 && sampleId == jumpSoundId) {
+                            isJumpSoundLoaded = true
+                        }
+                    }
+                }
 
-            jumpChar1SoundId = soundPool?.load(context, R.raw.jump, 1) ?: 0
-            jumpChar2SoundId = soundPool?.load(context, R.raw.jump_char2, 1) ?: 0
+            jumpSoundId = soundPool?.load(context, R.raw.jump, 1) ?: 0
         } catch (e: Exception) {
             Log.e("GameAudio", "Error initializing SoundPool", e)
         }
@@ -120,15 +124,11 @@ class GameAudio(private val context: Context) {
         }
     }
 
-    fun playJumpSound(character: SelectedCharacter = SelectedCharacter.CHARACTER_1) {
+    fun playJumpSound() {
         if (isMuted) return
         try {
-            val soundId = when (character) {
-                SelectedCharacter.CHARACTER_1 -> jumpChar1SoundId
-                SelectedCharacter.CHARACTER_2 -> jumpChar2SoundId
-            }
-            if (soundId != 0) {
-                soundPool?.play(soundId, 1.0f, 1.0f, 1, 0, 1.0f)
+            if (jumpSoundId != 0) {
+                soundPool?.play(jumpSoundId, 1.0f, 1.0f, 1, 0, 1.0f)
             }
         } catch (e: Exception) {
             Log.e("GameAudio", "Error playing jump sound", e)

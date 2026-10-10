@@ -3,20 +3,9 @@ package com.example.game
 enum class GameState {
     SPLASH,
     TITLE,
-    CHARACTER_SELECT,
     PLAYING,
     PAUSED,
     GAME_OVER
-}
-
-enum class SelectedCharacter(val id: Int, val displayName: String) {
-    CHARACTER_1(1, "Character 1"),
-    CHARACTER_2(2, "Character 2");
-
-    companion object {
-        fun fromId(id: Int): SelectedCharacter =
-            if (id == 2) CHARACTER_2 else CHARACTER_1
-    }
 }
 
 enum class PlayerPose {
@@ -26,10 +15,8 @@ enum class PlayerPose {
 }
 
 enum class ObstacleType {
-    BARRICADE,     // Low wooden saw-horse with hazard stripes - Jump required
-    CRATE,         // Low wooden shipping crate - Jump required
-    CONES,         // Low traffic cones - Jump required
-    OVERHEAD_BEAM  // Overhead caution sign / beam - Crouch/Slide required
+    GROUND_OBSTACLE,   // On the road surface - Jump required
+    OVERHEAD_OBSTACLE  // Elevated road barrier - Slide required
 }
 
 enum class GameOverReason {
@@ -44,6 +31,7 @@ data class Obstacle(
     val y: Float,
     val width: Float,
     val height: Float,
+    val variantIndex: Int = 0,
     var isPassed: Boolean = false,
     var isHit: Boolean = false
 )
@@ -53,6 +41,16 @@ data class CoinItem(
     var x: Float,
     var y: Float,
     val radius: Float = 22f,
+    var isCollected: Boolean = false
+)
+
+data class PowerUpItem(
+    val id: Long,
+    var x: Float,
+    var y: Float,
+    val width: Float,
+    val height: Float,
+    val variantIndex: Int = 0,
     var isCollected: Boolean = false
 )
 

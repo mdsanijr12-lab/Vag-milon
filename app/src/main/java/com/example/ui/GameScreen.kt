@@ -2,11 +2,16 @@ package com.example.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -15,10 +20,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.audio.GameAudio
 import com.example.game.GameEngine
@@ -31,32 +40,39 @@ fun GameScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val density = LocalDensity.current
-
     val engine = remember { GameEngine(context, audio) }
 
-    // Load Bitmaps for Character 1 and Character 2
-    val renderer = remember(engine.char2AssetVersion) {
-        val bgBmp = BitmapFactory.decodeResource(context.resources, R.drawable.bg_city)
+    // Load and validate all required game assets once
+    val (renderer, missingAssets) = remember {
+        val missing = mutableListOf<String>()
+        val bgMainBmp = BitmapFactory.decodeResource(context.resources, R.drawable.bg_main)
+            ?: run { missing.add("MAIN BACKGROUND (bg_main)"); null }
+        val bgParallaxBmp = BitmapFactory.decodeResource(context.resources, R.drawable.bg_parallax)
+            ?: run { missing.add("PARALLAX BACKGROUND (bg_parallax)"); null }
         val runBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_run)
+            ?: run { missing.add("CHARACTER RUN (player_run)"); null }
         val jumpBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_jump)
+            ?: run { missing.add("CHARACTER JUMP (player_jump)"); null }
         val crouchBmp = BitmapFactory.decodeResource(context.resources, R.drawable.player_crouch)
+            ?: run { missing.add("CHARACTER SLIDE (player_crouch)"); null }
+        val obstacleBmp = BitmapFactory.decodeResource(context.resources, R.drawable.obstacle_sprite)
+            ?: run { missing.add("OBSTACLE (obstacle_sprite)"); null }
+        val powerUpBmp = BitmapFactory.decodeResource(context.resources, R.drawable.powerup_sprite)
+            ?: run { missing.add("POWER-UP (powerup_sprite)"); null }
         val enemiesBmp = BitmapFactory.decodeResource(context.resources, R.drawable.enemies_chase)
+            ?: run { missing.add("ENEMIES (enemies_chase)"); null }
 
-        val char2Run = com.example.game.Character2AssetManager.loadRunSprite(context)
-        val char2Jump = com.example.game.Character2AssetManager.loadJumpSprite(context)
-        val char2Slide = com.example.game.Character2AssetManager.loadSlideSprite(context)
-
-        GameRenderer(
-            bgBitmap = bgBmp,
+        val gameRenderer = GameRenderer(
+            bgMainBitmap = bgMainBmp,
+            bgParallaxBitmap = bgParallaxBmp,
             playerRunBitmap = runBmp,
             playerJumpBitmap = jumpBmp,
             playerCrouchBitmap = crouchBmp,
-            enemiesBitmap = enemiesBmp,
-            char2RunSprite = char2Run,
-            char2JumpSprite = char2Jump,
-            char2SlideSprite = char2Slide
+            obstacleBitmap = obstacleBmp,
+            powerUpBitmap = powerUpBmp,
+            enemiesBitmap = enemiesBmp
         )
+        Pair(gameRenderer, missing.toList())
     }
 
     var animTime by remember { mutableFloatStateOf(0f) }
@@ -69,7 +85,7 @@ fun GameScreen(
         }
     }
 
-    // High performance frame loop
+    // High performance 60fps frame loop
     LaunchedEffect(engine.gameState) {
         var lastTime = 0L
         while (true) {
@@ -95,7 +111,7 @@ fun GameScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                // Direct gesture support: tap to jump, swipe down to crouch/slide
+                // Direct gesture support: tap to jump, swipe down to slide
                 .pointerInput(engine.gameState) {
                     if (engine.gameState == GameState.PLAYING) {
                         detectTapGestures(
@@ -124,10 +140,29 @@ fun GameScreen(
                     }
                 }
         ) {
-            // Main 60fps Game Canvas (rendered during gameplay, pause, title, and game over)
+            // Main 60fps Game Canvas
             if (engine.gameState != GameState.SPLASH) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     renderer.render(this, engine, animTime)
+                }
+            }
+
+            // Clear asset-loading error display if any asset ever failed to decode
+            if (missingAssets.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFD50000),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "Asset Loading Error: ${missingAssets.joinToString(", ")}",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
             }
 
@@ -142,14 +177,6 @@ fun GameScreen(
                 GameState.TITLE -> {
                     TitleScreen(
                         engine = engine,
-                        onStartGame = { engine.startGame() },
-                        onOpenCharacters = { engine.openCharacterSelection() }
-                    )
-                }
-                GameState.CHARACTER_SELECT -> {
-                    CharacterSelectionScreen(
-                        engine = engine,
-                        onBack = { engine.closeCharacterSelection() },
                         onStartGame = { engine.startGame() }
                     )
                 }

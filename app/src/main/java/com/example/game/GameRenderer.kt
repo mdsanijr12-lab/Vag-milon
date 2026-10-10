@@ -1,41 +1,38 @@
 package com.example.game
 
 import android.graphics.Bitmap
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
 class GameRenderer(
-    private val bgBitmap: Bitmap?,
-    private val playerRunBitmap: Bitmap?,
-    private val playerJumpBitmap: Bitmap?,
-    private val playerCrouchBitmap: Bitmap?,
-    private val enemiesBitmap: Bitmap?,
-    private val char2RunSprite: PoseSprite? = null,
-    private val char2JumpSprite: PoseSprite? = null,
-    private val char2SlideSprite: PoseSprite? = null
+    bgMainBitmap: Bitmap?,
+    bgParallaxBitmap: Bitmap?,
+    playerRunBitmap: Bitmap?,
+    playerJumpBitmap: Bitmap?,
+    playerCrouchBitmap: Bitmap?,
+    obstacleBitmap: Bitmap?,
+    powerUpBitmap: Bitmap?,
+    enemiesBitmap: Bitmap?
 ) {
-    private val bgImage = bgBitmap?.asImageBitmap()
+    private val bgMainImage = bgMainBitmap?.asImageBitmap()
+    private val bgParallaxImage = bgParallaxBitmap?.asImageBitmap()
     private val playerRunImage = playerRunBitmap?.asImageBitmap()
     private val playerJumpImage = playerJumpBitmap?.asImageBitmap()
     private val playerCrouchImage = playerCrouchBitmap?.asImageBitmap()
+    private val obstacleImage = obstacleBitmap?.asImageBitmap()
+    private val powerUpImage = powerUpBitmap?.asImageBitmap()
     private val enemiesImage = enemiesBitmap?.asImageBitmap()
-
-    private val char2RunImage = char2RunSprite?.bitmap?.asImageBitmap()
-    private val char2JumpImage = char2JumpSprite?.bitmap?.asImageBitmap()
-    private val char2SlideImage = char2SlideSprite?.bitmap?.asImageBitmap()
 
     fun render(
         drawScope: DrawScope,
@@ -46,57 +43,104 @@ class GameRenderer(
             val canvasW = size.width
             val canvasH = size.height
 
-            // 1. Draw 2D Side-scrolling City Road Background
-            drawScrollingBackground(canvasW, canvasH, engine.bgScrollOffset)
+            // 1. Draw Parallax Background + Main Environment Background
+            drawScrollingBackground(
+                canvasW = canvasW,
+                canvasH = canvasH,
+                mainScrollOffset = engine.bgScrollOffset,
+                parallaxScrollOffset = engine.parallaxScrollOffset,
+                groundY = engine.groundY
+            )
 
-            // 2. Draw Obstacles (Barricades, Crates, Cones, Overhead Beams)
+            // 2. Draw Obstacles on the road
             drawObstacles(engine)
 
-            // 3. Draw Collectible 2D Coins
+            // 3. Draw Collectible Coins along the running path
             drawCoins(engine, animTime)
 
-            // 4. Draw Chasing Students Mob (STRICTLY BEHIND THE MAIN CHARACTER)
+            // 4. Draw Collectible Power-Ups along the running path
+            drawPowerUps(engine, animTime)
+
+            // 5. Draw Chasing Enemies strictly behind the main character
             drawEnemies(engine, animTime)
 
-            // 5. Draw Main Character (Milon) with exact state poses on the road
+            // 6. Draw New Playable Character (RUN / JUMP / SLIDE)
             drawPlayer(engine, animTime)
 
-            // 6. Draw Dust & Sparkle Particles
+            // 7. Draw Particles
             drawParticles(engine)
 
-            // 7. Danger warning vignette when enemies get close
+            // 8. Danger warning vignette when enemies get close
             drawTensionWarning(canvasW, canvasH, engine, animTime)
         }
     }
 
-    private fun DrawScope.drawScrollingBackground(canvasW: Float, canvasH: Float, scrollOffset: Float) {
-        if (bgImage != null) {
-            // Keep original 1742x980 aspect ratio scaled to fill canvas height
-            val bgScale = canvasH / 980f
-            val tileWidth = 1742f * bgScale
+    private fun DrawScope.drawScrollingBackground(
+        canvasW: Float,
+        canvasH: Float,
+        mainScrollOffset: Float,
+        parallaxScrollOffset: Float,
+        groundY: Float
+    ) {
+        // Sky & horizon backdrop so there are never black gaps on any aspect ratio
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF90CAF9),
+                    Color(0xFFE3F2FD),
+                    Color(0xFF37474F)
+                ),
+                startY = 0f,
+                endY = canvasH
+            ),
+            size = size
+        )
 
-            val offset = (scrollOffset % tileWidth)
+        // Distant Parallax Layer (bg_parallax.png: 1324x236)
+        if (bgParallaxImage != null && bgParallaxImage.height > 0) {
+            val parallaxTop = 0f
+            val parallaxHeight = canvasH * 0.54f
+            val aspect = bgParallaxImage.width.toFloat() / bgParallaxImage.height.toFloat()
+            val tileWidth = (parallaxHeight * aspect).coerceAtLeast(64f)
+
+            val offset = ((parallaxScrollOffset % tileWidth) + tileWidth) % tileWidth
             var currentX = -offset
-
-            // Tile across screen horizontally for seamless scrolling
             while (currentX < canvasW) {
                 drawImage(
-                    image = bgImage,
-                    dstOffset = IntOffset(currentX.toInt(), 0),
-                    dstSize = IntSize(tileWidth.toInt() + 2, canvasH.toInt())
+                    image = bgParallaxImage,
+                    dstOffset = IntOffset(currentX.toInt(), parallaxTop.toInt()),
+                    dstSize = IntSize(tileWidth.toInt() + 3, parallaxHeight.toInt())
                 )
                 currentX += tileWidth
             }
-        } else {
-            drawRect(
-                brush = Brush.verticalGradient(
-                    listOf(Color(0xFF87CEEB), Color(0xFFE0F7FA), Color(0xFF333A4C)),
-                    startY = 0f,
-                    endY = canvasH
-                ),
-                size = size
-            )
         }
+
+        // Main Foreground & Road Layer (bg_main.png: 768x204)
+        if (bgMainImage != null && bgMainImage.height > 0) {
+            val mainHeight = canvasH * 0.56f
+            val mainTop = canvasH - mainHeight
+            val aspect = bgMainImage.width.toFloat() / bgMainImage.height.toFloat()
+            val tileWidth = (mainHeight * aspect).coerceAtLeast(64f)
+
+            val offset = ((mainScrollOffset % tileWidth) + tileWidth) % tileWidth
+            var currentX = -offset
+            while (currentX < canvasW) {
+                drawImage(
+                    image = bgMainImage,
+                    dstOffset = IntOffset(currentX.toInt(), mainTop.toInt()),
+                    dstSize = IntSize(tileWidth.toInt() + 3, mainHeight.toInt())
+                )
+                currentX += tileWidth
+            }
+        }
+
+        // Subtle road surface shadow line at groundY so feet and obstacles look firmly grounded
+        drawLine(
+            color = Color.Black.copy(alpha = 0.25f),
+            start = Offset(0f, groundY + 2f),
+            end = Offset(canvasW, groundY + 2f),
+            strokeWidth = 4f
+        )
     }
 
     private fun DrawScope.drawEnemies(engine: GameEngine, animTime: Float) {
@@ -107,12 +151,9 @@ class GameRenderer(
         val fullHeight = engine.enemyHeight / visibleRatio
         val fullWidth = fullHeight * (597f / 526f)
 
-        // The nearest enemy is at the front (right edge) of the enemy sprite.
-        // Maintain a clearly visible gap strictly behind playerX.
+        // The nearest enemy is strictly behind playerX by visibleGapBehindPlayer
         val nearestEnemyX = engine.playerX - engine.visibleGapBehindPlayer
         val drawX = nearestEnemyX - fullWidth
-
-        // Feet rest directly on engine.groundY (the road)
         val drawY = engine.groundY - (fullHeight * visibleRatio) + bounce
 
         if (enemiesImage != null) {
@@ -128,106 +169,95 @@ class GameRenderer(
         val px = engine.playerX
         val py = engine.playerY
         val isStumbling = engine.stumbleTimer > 0f
-        val isChar2 = engine.selectedCharacter == SelectedCharacter.CHARACTER_2
 
         // Stumble blink effect
         if (isStumbling && sin(animTime * 28f) > 0.35f) {
             return
         }
 
+        // All 3 character sprites share an 887px canvas height:
+        // player_run: 557x887 (feet at 787/887)
+        // player_jump: 561x887 (feet at 785/887 relative to jump elevation)
+        // player_crouch: 726x887 (bottom at 784/887)
+        val canvasScale = engine.playerCanvasHeight / 887f
+
+        // Active Speed Boost Aura when power-up is active
+        if (engine.isPowerUpActive) {
+            val auraCenterX = px + engine.playerStandWidth * 0.5f
+            val auraCenterY = py - engine.playerStandHeight * 0.45f
+            val pulse = 1.0f + sin(animTime * 18f) * 0.08f
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0x8800E5FF),
+                        Color(0x44FFD700),
+                        Color.Transparent
+                    ),
+                    center = Offset(auraCenterX, auraCenterY),
+                    radius = engine.playerStandHeight * 0.65f * pulse
+                ),
+                radius = engine.playerStandHeight * 0.65f * pulse,
+                center = Offset(auraCenterX, auraCenterY)
+            )
+        }
+
         when (engine.playerPose) {
             PlayerPose.RUN -> {
-                val visibleRatio = if (isChar2 && char2RunSprite != null) {
-                    char2RunSprite.visibleBottomRatio
-                } else {
-                    203f / 256f
-                }
-                val aspect = if (isChar2 && char2RunSprite != null) {
-                    char2RunSprite.aspectRatio
-                } else {
-                    124f / 256f
-                }
-                val fullHeight = engine.playerStandHeight / visibleRatio
-                val fullWidth = fullHeight * aspect
+                val drawW = 557f * canvasScale
+                val drawH = 887f * canvasScale
+                val feetOffset = 787f * canvasScale
+                val bob = abs(sin(animTime * 16f)) * 3.5f
+                val drawY = engine.groundY - feetOffset + bob
 
-                // Gentle footstep bobbing on the road
-                val bob = abs(sin(animTime * 16f)) * 4f
-                val drawY = engine.groundY - (fullHeight * visibleRatio) + bob
-
-                val img = if (isChar2 && char2RunImage != null) char2RunImage else playerRunImage
-                if (img != null) {
+                if (playerRunImage != null) {
                     drawImage(
-                        image = img,
+                        image = playerRunImage,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
-                        dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
+                        dstSize = IntSize(drawW.toInt(), drawH.toInt())
                     )
                 }
             }
 
             PlayerPose.JUMP -> {
-                val visibleRatio = if (isChar2 && char2JumpSprite != null) {
-                    char2JumpSprite.visibleBottomRatio
-                } else {
-                    194f / 256f
-                }
-                val aspect = if (isChar2 && char2JumpSprite != null) {
-                    char2JumpSprite.aspectRatio
-                } else {
-                    120f / 256f
-                }
-                val fullHeight = engine.playerStandHeight / visibleRatio
-                val fullWidth = fullHeight * aspect
+                val drawW = 561f * canvasScale
+                val drawH = 887f * canvasScale
+                val feetOffset = 785f * canvasScale
+                val drawY = py - feetOffset
 
-                // Elevated above the road based on jump physics
-                val drawY = py - (fullHeight * visibleRatio)
-
-                val img = if (isChar2 && char2JumpImage != null) char2JumpImage else playerJumpImage
-                if (img != null) {
+                if (playerJumpImage != null) {
                     drawImage(
-                        image = img,
+                        image = playerJumpImage,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
-                        dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
+                        dstSize = IntSize(drawW.toInt(), drawH.toInt())
                     )
                 }
             }
 
             PlayerPose.CROUCH -> {
-                val visibleRatio = if (isChar2 && char2SlideSprite != null) {
-                    char2SlideSprite.visibleBottomRatio
-                } else {
-                    176f / 232f
-                }
-                val aspect = if (isChar2 && char2SlideSprite != null) {
-                    char2SlideSprite.aspectRatio
-                } else {
-                    140f / 232f
-                }
-                val fullHeight = engine.playerCrouchHeight / visibleRatio
-                val fullWidth = fullHeight * aspect
+                val drawW = 726f * canvasScale
+                val drawH = 887f * canvasScale
+                val bottomOffset = 784f * canvasScale
+                val drawY = engine.groundY - bottomOffset
 
-                // Resting flat on the road
-                val drawY = engine.groundY - (fullHeight * visibleRatio)
-
-                val img = if (isChar2 && char2SlideImage != null) char2SlideImage else playerCrouchImage
-                if (img != null) {
+                if (playerCrouchImage != null) {
                     drawImage(
-                        image = img,
+                        image = playerCrouchImage,
                         dstOffset = IntOffset(px.toInt(), drawY.toInt()),
-                        dstSize = IntSize(fullWidth.toInt(), fullHeight.toInt())
+                        dstSize = IntSize(drawW.toInt(), drawH.toInt())
                     )
                 }
 
                 // Speed lines behind sliding character
                 drawLine(
-                    color = Color.White.copy(alpha = 0.55f),
-                    start = Offset(px - 15f, engine.groundY - 14f),
-                    end = Offset(px - 50f, engine.groundY - 14f),
+                    color = Color.White.copy(alpha = 0.6f),
+                    start = Offset(px - 12f, engine.groundY - 14f),
+                    end = Offset(px - 52f, engine.groundY - 14f),
                     strokeWidth = 3f
                 )
                 drawLine(
                     color = Color.White.copy(alpha = 0.45f),
-                    start = Offset(px - 10f, engine.groundY - 28f),
-                    end = Offset(px - 40f, engine.groundY - 28f),
+                    start = Offset(px - 8f, engine.groundY - 28f),
+                    end = Offset(px - 42f, engine.groundY - 28f),
                     strokeWidth = 2.5f
                 )
             }
@@ -235,221 +265,154 @@ class GameRenderer(
     }
 
     private fun DrawScope.drawObstacles(engine: GameEngine) {
+        val img = obstacleImage
         for (obs in engine.obstacles) {
             val ox = obs.x
             val oy = obs.y
             val ow = obs.width
             val oh = obs.height
 
-            when (obs.type) {
-                ObstacleType.BARRICADE -> drawBarricade(ox, oy, ow, oh)
-                ObstacleType.CRATE -> drawCrate(ox, oy, ow, oh)
-                ObstacleType.CONES -> drawCones(ox, oy, ow, oh)
-                ObstacleType.OVERHEAD_BEAM -> drawOverheadBeam(ox, oy, ow, oh)
+            if (obs.type == ObstacleType.OVERHEAD_OBSTACLE) {
+                // Support posts down to the road so player sees it's an overhead slide-under barrier
+                val postColor = Color(0xFF37474F)
+                drawRect(
+                    color = postColor,
+                    topLeft = Offset(ox + 4f, oy + oh),
+                    size = Size(8f, (engine.groundY - (oy + oh)).coerceAtLeast(0f))
+                )
+                drawRect(
+                    color = postColor,
+                    topLeft = Offset(ox + ow - 12f, oy + oh),
+                    size = Size(8f, (engine.groundY - (oy + oh)).coerceAtLeast(0f))
+                )
+            }
+
+            if (img != null && img.width > 0 && img.height > 0) {
+                // obstacle_sprite.png (1536x204): sample a proportional frame without stretching
+                val frameCount = 4
+                val frameW = img.width / frameCount
+                val frameIdx = obs.variantIndex.coerceIn(0, frameCount - 1)
+                val srcX = frameIdx * frameW
+
+                drawImage(
+                    image = img,
+                    srcOffset = IntOffset(srcX, 0),
+                    srcSize = IntSize(frameW, img.height),
+                    dstOffset = IntOffset(ox.toInt(), oy.toInt()),
+                    dstSize = IntSize(ow.toInt(), oh.toInt())
+                )
+
+                // Crisp hazard highlight border so obstacles stand out clearly on the road
+                val borderColor = if (obs.type == ObstacleType.OVERHEAD_OBSTACLE) {
+                    Color(0xFFFFD600)
+                } else {
+                    Color(0xFFFF6D00)
+                }
+                drawRoundRect(
+                    color = borderColor.copy(alpha = 0.85f),
+                    topLeft = Offset(ox, oy),
+                    size = Size(ow, oh),
+                    cornerRadius = CornerRadius(6f, 6f),
+                    style = Stroke(width = 2.5f)
+                )
             }
         }
     }
 
-    private fun DrawScope.drawBarricade(x: Float, y: Float, w: Float, h: Float) {
-        // Wooden legs resting on road
-        val legW = w * 0.12f
-        drawRect(Color(0xFF5D4037), Offset(x + w * 0.12f, y + h * 0.25f), Size(legW, h * 0.75f))
-        drawRect(Color(0xFF5D4037), Offset(x + w * 0.76f, y + h * 0.25f), Size(legW, h * 0.75f))
+    private fun DrawScope.drawPowerUps(engine: GameEngine, animTime: Float) {
+        val img = powerUpImage ?: return
+        if (img.width <= 0 || img.height <= 0) return
 
-        // Horizontal hazard plank
-        val plankH = h * 0.42f
-        val plankY = y + h * 0.10f
-        drawRoundRect(
-            color = Color(0xFFFF9800),
-            topLeft = Offset(x, plankY),
-            size = Size(w, plankH),
-            style = Fill
-        )
+        val frameCount = 4
+        val frameW = img.width / frameCount
 
-        // Reflective hazard stripes
-        val stripeCount = 4
-        val step = w / stripeCount
-        for (i in 0 until stripeCount) {
-            val sx = x + i * step + 4f
-            val path = Path().apply {
-                moveTo(sx, plankY)
-                lineTo(sx + step * 0.5f, plankY)
-                lineTo(sx + step * 0.25f, plankY + plankH)
-                lineTo(sx - step * 0.25f, plankY + plankH)
-                close()
-            }
-            drawPath(path, color = Color.White)
-        }
+        for (item in engine.powerUps) {
+            if (item.isCollected) continue
 
-        // Outline
-        drawRoundRect(
-            color = Color(0xFF3E2723),
-            topLeft = Offset(x, plankY),
-            size = Size(w, plankH),
-            style = Stroke(width = 2.5f)
-        )
-    }
+            val bob = sin(animTime * 7f + item.id) * 5f
+            val drawX = item.x
+            val drawY = item.y + bob
+            val centerX = drawX + item.width * 0.5f
+            val centerY = drawY + item.height * 0.5f
 
-    private fun DrawScope.drawCrate(x: Float, y: Float, w: Float, h: Float) {
-        // Wooden shipping box on the road
-        drawRoundRect(
-            color = Color(0xFF8D6E63),
-            topLeft = Offset(x, y),
-            size = Size(w, h),
-            style = Fill
-        )
-
-        // Planks
-        drawLine(
-            color = Color(0xFF4E342E),
-            start = Offset(x, y + h * 0.33f),
-            end = Offset(x + w, y + h * 0.33f),
-            strokeWidth = 2.5f
-        )
-        drawLine(
-            color = Color(0xFF4E342E),
-            start = Offset(x, y + h * 0.66f),
-            end = Offset(x + w, y + h * 0.66f),
-            strokeWidth = 2.5f
-        )
-
-        // Cross braces
-        drawLine(
-            color = Color(0xFF4E342E),
-            start = Offset(x + 4f, y + 4f),
-            end = Offset(x + w - 4f, y + h - 4f),
-            strokeWidth = 3f
-        )
-        drawLine(
-            color = Color(0xFF4E342E),
-            start = Offset(x + w - 4f, y + 4f),
-            end = Offset(x + 4f, y + h - 4f),
-            strokeWidth = 3f
-        )
-
-        drawRoundRect(
-            color = Color(0xFF3E2723),
-            topLeft = Offset(x, y),
-            size = Size(w, h),
-            style = Stroke(width = 3f)
-        )
-    }
-
-    private fun DrawScope.drawCones(x: Float, y: Float, w: Float, h: Float) {
-        val coneW = w * 0.48f
-        for (i in 0..1) {
-            val cx = x + i * (coneW + w * 0.04f)
-            // Base plate on the road
-            drawRoundRect(
-                color = Color(0xFF212121),
-                topLeft = Offset(cx, y + h - 8f),
-                size = Size(coneW, 8f)
+            // Glowing aura around power-up
+            drawCircle(
+                color = Color(0x5500E5FF),
+                radius = maxOf(item.width, item.height) * 0.65f,
+                center = Offset(centerX, centerY)
             )
 
-            // Orange cone
-            val path = Path().apply {
-                moveTo(cx + coneW * 0.5f, y)
-                lineTo(cx + coneW - 2f, y + h - 8f)
-                lineTo(cx + 2f, y + h - 8f)
-                close()
-            }
-            drawPath(path, color = Color(0xFFFF5722))
+            val frameIdx = item.variantIndex.coerceIn(0, frameCount - 1)
+            val srcX = frameIdx * frameW
 
-            // White reflective collar
-            val stripePath = Path().apply {
-                moveTo(cx + coneW * 0.34f, y + h * 0.44f)
-                lineTo(cx + coneW * 0.66f, y + h * 0.44f)
-                lineTo(cx + coneW * 0.74f, y + h * 0.66f)
-                lineTo(cx + coneW * 0.26f, y + h * 0.66f)
-                close()
-            }
-            drawPath(stripePath, color = Color.White)
+            drawImage(
+                image = img,
+                srcOffset = IntOffset(srcX, 0),
+                srcSize = IntSize(frameW, img.height),
+                dstOffset = IntOffset(drawX.toInt(), drawY.toInt()),
+                dstSize = IntSize(item.width.toInt(), item.height.toInt())
+            )
+
+            drawRoundRect(
+                color = Color(0xFF00E5FF),
+                topLeft = Offset(drawX, drawY),
+                size = Size(item.width, item.height),
+                cornerRadius = CornerRadius(10f, 10f),
+                style = Stroke(width = 2.5f)
+            )
         }
-    }
-
-    private fun DrawScope.drawOverheadBeam(x: Float, y: Float, w: Float, h: Float) {
-        // Vertical hanging bars from top of screen
-        drawRect(Color(0xFF37474F), Offset(x + w * 0.12f, 0f), Size(6f, y + 8f))
-        drawRect(Color(0xFF37474F), Offset(x + w * 0.82f, 0f), Size(6f, y + 8f))
-
-        // Caution girder
-        drawRoundRect(
-            color = Color(0xFFFFD600),
-            topLeft = Offset(x, y),
-            size = Size(w, h),
-            style = Fill
-        )
-
-        // Diagonal caution stripes
-        val count = 5
-        val step = w / count
-        for (i in 0 until count) {
-            val sx = x + i * step + 4f
-            val path = Path().apply {
-                moveTo(sx, y)
-                lineTo(sx + step * 0.5f, y)
-                lineTo(sx + step * 0.2f, y + h)
-                lineTo(sx - step * 0.3f, y + h)
-                close()
-            }
-            drawPath(path, color = Color(0xFF212121))
-        }
-
-        drawRoundRect(
-            color = Color(0xFF212121),
-            topLeft = Offset(x, y),
-            size = Size(w, h),
-            style = Stroke(width = 3f)
-        )
-
-        // Hanging red "SLIDE!" banner
-        drawRoundRect(
-            color = Color(0xFFD32F2F),
-            topLeft = Offset(x + w * 0.18f, y + h - 2f),
-            size = Size(w * 0.64f, 15f)
-        )
     }
 
     private fun DrawScope.drawCoins(engine: GameEngine, animTime: Float) {
         for (coin in engine.coins) {
+            if (coin.isCollected) continue
+
+            val pulse = 1.0f + sin(animTime * 8f + coin.id) * 0.08f
+            val r = coin.radius * pulse
             val cx = coin.x
             val cy = coin.y
-            val r = coin.radius
 
-            val spinScale = abs(cos(animTime * 6f + coin.id * 0.5f)).coerceAtLeast(0.18f)
-            val coinW = r * 2f * spinScale
-            val coinH = r * 2f
+            // Outer glow
+            drawCircle(
+                color = Color(0x55FFD700),
+                radius = r * 1.35f,
+                center = Offset(cx, cy)
+            )
 
-            drawOval(
+            // Main Gold Coin Body
+            drawCircle(
                 brush = Brush.radialGradient(
-                    colors = listOf(Color(0xFFFFEE58), Color(0xFFFFB300), Color(0xFFFF8F00)),
-                    center = Offset(cx, cy),
-                    radius = r
+                    colors = listOf(Color(0xFFFFF59D), Color(0xFFFFC107), Color(0xFFFF8F00)),
+                    center = Offset(cx - r * 0.25f, cy - r * 0.25f),
+                    radius = r * 1.2f
                 ),
-                topLeft = Offset(cx - coinW / 2f, cy - coinH / 2f),
-                size = Size(coinW, coinH)
+                radius = r,
+                center = Offset(cx, cy)
             )
 
-            drawOval(
-                color = Color(0xFFFFF9C4),
-                topLeft = Offset(cx - (coinW * 0.7f) / 2f, cy - (coinH * 0.7f) / 2f),
-                size = Size(coinW * 0.7f, coinH * 0.7f),
-                style = Stroke(width = 2f)
+            // Gold Rim
+            drawCircle(
+                color = Color(0xFFFFE082),
+                radius = r * 0.78f,
+                center = Offset(cx, cy),
+                style = Stroke(width = 2.5f)
             )
 
-            val sparkleX = cx - coinW * 0.25f
-            val sparkleY = cy - coinH * 0.25f
-            drawCircle(Color.White.copy(alpha = 0.8f), radius = 2.5f, center = Offset(sparkleX, sparkleY))
+            // Inner Shine
+            drawRect(
+                color = Color(0xFFFFFDE7),
+                topLeft = Offset(cx - r * 0.14f, cy - r * 0.42f),
+                size = Size(r * 0.28f, r * 0.84f)
+            )
         }
     }
 
     private fun DrawScope.drawParticles(engine: GameEngine) {
         for (p in engine.particles) {
-            val alpha = (1f - (p.currentLife / p.maxLife)).coerceIn(0f, 1f)
-            val color = Color(p.color).copy(alpha = alpha)
+            val alpha = (1.0f - (p.currentLife / p.maxLife)).coerceIn(0f, 1f)
             drawCircle(
-                color = color,
-                radius = p.radius * (1f - p.currentLife / (p.maxLife * 1.5f)),
+                color = Color(p.color).copy(alpha = alpha),
+                radius = p.radius,
                 center = Offset(p.x, p.y)
             )
         }
@@ -461,19 +424,17 @@ class GameRenderer(
         engine: GameEngine,
         animTime: Float
     ) {
-        val dist = engine.visibleGapBehindPlayer
-        if (dist < 100f) {
-            val intensity = ((100f - dist) / 80f).coerceIn(0f, 1f)
-            val pulse = (sin(animTime * 10f) * 0.5f + 0.5f) * intensity
-            val alpha = (pulse * 0.42f).coerceIn(0f, 0.42f)
+        if (engine.visibleGapBehindPlayer < 120f) {
+            val intensity = ((120f - engine.visibleGapBehindPlayer) / 80f).coerceIn(0f, 1f)
+            val pulse = (sin(animTime * 15f) * 0.5f + 0.5f) * intensity * 0.35f
 
             drawRect(
                 brush = Brush.horizontalGradient(
-                    colors = listOf(Color.Red.copy(alpha = alpha), Color.Transparent),
+                    colors = listOf(Color.Red.copy(alpha = pulse), Color.Transparent),
                     startX = 0f,
-                    endX = canvasW * 0.35f
+                    endX = min(300f, canvasW * 0.28f)
                 ),
-                size = size
+                size = Size(min(300f, canvasW * 0.28f), canvasH)
             )
         }
     }

@@ -24,16 +24,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VolumeMute
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,95 +64,143 @@ fun HUDControls(
 
     Box(modifier = modifier.fillMaxSize()) {
         // TOP HUD BAR
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Distance counter
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color.Black.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF64B5F6))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(text = "🏃 ", fontSize = 16.sp)
-                    Text(
-                        text = "${engine.distanceTraveled.toInt()} m",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-
-            // Chasing Students proximity indicator
-            ThreatIndicator(distanceBehind = engine.visibleGapBehindPlayer)
-
-            // Right HUD: Coin counter + Audio toggle + Pause button
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Coins
+                // Distance counter
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.Black.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD54F))
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF64B5F6))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "🪙 ", fontSize = 15.sp)
+                        Text(text = "🏃 ", fontSize = 16.sp)
                         Text(
-                            text = "${engine.coinCount}",
-                            color = Color(0xFFFFD54F),
+                            text = "${engine.distanceTraveled.toInt()} m",
+                            color = Color.White,
                             fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.testTag("hud_distance_text")
                         )
                     }
                 }
 
-                // Audio Mute/Unmute
-                IconButton(
-                    onClick = { engine.audio.toggleMute() },
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
-                        .testTag("hud_sound_button")
-                ) {
-                    Icon(
-                        imageVector = if (engine.audio.isAudioMuted()) Icons.Default.VolumeMute else Icons.Default.VolumeUp,
-                        contentDescription = "Mute/Unmute",
-                        tint = if (engine.audio.isAudioMuted()) Color(0xFFFF5252) else Color(0xFF69F0AE),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                // Chasing Students proximity indicator
+                ThreatIndicator(distanceBehind = engine.visibleGapBehindPlayer)
 
-                // Pause button
-                IconButton(
-                    onClick = onPauseToggle,
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
-                        .testTag("hud_pause_button")
+                // Right HUD: Coin counter + Audio toggle + Pause button
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                        contentDescription = "Pause",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    // Coins
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Black.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFFFD54F))
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(text = "🪙 ", fontSize = 15.sp)
+                            Text(
+                                text = "${engine.coinCount}",
+                                color = Color(0xFFFFD54F),
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.testTag("hud_coin_text")
+                            )
+                        }
+                    }
+
+                    // Audio Mute/Unmute
+                    IconButton(
+                        onClick = { engine.audio.toggleMute() },
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                            .testTag("hud_sound_button")
+                    ) {
+                        Icon(
+                            imageVector = if (engine.audio.isAudioMuted()) Icons.Default.VolumeMute else Icons.Default.VolumeUp,
+                            contentDescription = "Mute/Unmute",
+                            tint = if (engine.audio.isAudioMuted()) Color(0xFFFF5252) else Color(0xFF69F0AE),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Pause button
+                    IconButton(
+                        onClick = onPauseToggle,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                            .testTag("hud_pause_button")
+                    ) {
+                        Icon(
+                            imageVector = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            contentDescription = "Pause",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+
+            // Active Power-Up Speed Boost Indicator Banner
+            if (engine.isPowerUpActive) {
+                Spacer(modifier = Modifier.height(6.dp))
+                val progress = (engine.powerUpTimer / engine.powerUpMaxDuration).coerceIn(0f, 1f)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xCC002B36),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF00E5FF)),
+                    modifier = Modifier.testTag("hud_powerup_indicator")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = "Speed Boost Active",
+                            tint = Color(0xFF00E5FF),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "SPEED BOOST",
+                            color = Color(0xFF00E5FF),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            color = Color(0xFF00E5FF),
+                            trackColor = Color.White.copy(alpha = 0.25f),
+                            modifier = Modifier
+                                .width(90.dp)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                        )
+                    }
                 }
             }
         }
@@ -264,7 +312,6 @@ private fun TransparentActionButton(
     onPress: () -> Unit,
     onRelease: () -> Unit
 ) {
-    // Large, transparent, clean button that does not obstruct the gameplay view
     Box(
         modifier = Modifier
             .size(width = 96.dp, height = 80.dp)
